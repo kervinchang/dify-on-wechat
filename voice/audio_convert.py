@@ -11,6 +11,7 @@ except ImportError:
 
 try:
     from pydub import AudioSegment
+    from pydub.utils import mediainfo
 except ImportError:
     logger.warning("import pydub failed, wechat voice conversion will not be supported. Try: pip install pydub")
 
@@ -199,3 +200,12 @@ def split_audio(file_path, max_segment_length_ms=60000):
         segment.export(path, format=format)
         files.append(path)
     return audio_length_ms, files
+
+
+def get_audio_duration(file_path):
+    """
+    获取音频时长
+    """
+    audio_info = mediainfo(file_path)
+    duration = float(audio_info['duration'])
+    return int(duration)

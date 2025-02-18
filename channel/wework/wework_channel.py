@@ -21,6 +21,7 @@ from config import conf
 from channel.wework.run import wework
 from channel.wework import run
 from PIL import Image
+from voice.audio_convert import any_to_amr, split_audio, get_audio_duration
 
 
 def get_wxid_by_name(room_members, group_wxid, name):
@@ -327,6 +328,19 @@ class WeworkChannel(ChatChannel):
         elif reply.type == ReplyType.VOICE:
             current_dir = os.getcwd()
             voice_file = reply.content.split("/")[-1]
-            reply.content = os.path.join(current_dir, "tmp", voice_file)
-            wework.send_file(receiver, reply.content)
-            logger.info("[WX] sendFile={}, receiver={}".format(reply.content, receiver))
+            file_path = os.path.join(current_dir, "tmp", voice_file)
+            amr_file = os.path.splitext(file_path)[0] + ".amr"
+            any_to_amr(file_path, amr_file)
+            duration, audio_files = split_audio(amr_file, 60 * 1000)
+            if len(audio_files) > 1:
+                logger.info("[WX] voice too long {}s > 60s , split into {} parts".format(duration / 1000.0, len(audio_files)))
+            for audio_file in audio_files:
+                cdn = wework.cdn_upload(audio_file, 5)
+                logger.debug("[WX] upload voice cdn: {}".format(cdn))
+                file_id = cdn["file_id"]
+                size = cdn["file_size"]
+                voice_time = get_audio_duration(audio_file)
+                aes_key = cdn["file_aes_key"]
+                md5 = cdn["file_md5"]
+                wework.send_voice(receiver, file_id, size, voice_time, aes_key, md5)
+                logger.info("[WX] sendVoice, receiver={}".format(receiver))
